@@ -1,0 +1,8 @@
+verification_limit,numeric_limit,human_review_count,human_review_pct,caught_fraud,missed_fraud,blocked_legitimate,expected_decision_cost
+$10k,10000.0,14,6.8,10,0,0,242.0
+$50k,50000.0,14,6.8,10,0,0,242.0
+$100k,100000.0,13,6.31,10,0,0,227.0
+$250k,250000.0,8,3.88,10,0,0,152.0
+$500k,500000.0,6,2.91,10,0,0,130.0
+$1.0M,1000000.0,4,1.94,10,0,0,116.0
+No Limit (Inf),inf,3,1.46,10,0,0,101.0

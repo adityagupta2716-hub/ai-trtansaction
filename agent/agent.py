@@ -136,7 +136,8 @@ class UtilityAgent:
         return {
             'transaction_id': txn_id,
             'decision': best_action,
-            'confidence': round(confidence, 3),
+            'confidence': round(confidence, 3),  # Normalized heuristic margin
+            'decision_margin': round(utility_gap, 3),  # Expected utility gap
             'p_fraud': round(p_adj, 3),
             'expected_utilities': rounded_eu,
             'reasoning': reasoning

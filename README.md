@@ -1,122 +1,136 @@
-# AI Transaction Monitor
+# AI Transaction Monitor: Research-Grade Fraud Detection & Utility Agent
 
-Academic prototype that scores synthetic payment transactions for fraud, chooses an action with a utility-based agent, and shows the result in a dashboard.
+A reproducible, explainable, research-grade financial fraud detection platform combining:
+1. **Unsupervised Anomaly Detection & Calibration:** Isolation Forest + Logistic Regression calibrator.
+2. **Context-Aware Utility Agent:** Expected Utility Theory (EUT) incorporating dynamic customer profiles.
+3. **Deterministic Human-Verification Limit:** Database-backed mandatory review threshold replacing hardcoded guardrails.
+4. **Strict Multi-Tenant Isolation:** Complete workspace separation by organization with database-enforced composite boundaries and role-based memberships.
+5. **Active Learning via Policy Adaptation:** Human review feedback refines the utility payoff matrix without catastrophic model forgetting.
+6. **Role-Based Financial Risk Workstation:** FastAPI backend and Streamlit multi-tenant compliance dashboard with clip-free navigation styling.
+7. **Reproducible Experimentation Suite:** Standardized benchmarks, ablation studies, and sensitivity trade-offs.
 
-This is not for real payment decisions. Scores are experimental and are not calibrated to real-world fraud rates. Ground-truth labels are for evaluation only and are not model inputs.
+---
 
-## What it does
+## 1. Quick Start & Installation
 
-1. An isolation forest plus a calibrator scores each transaction (`model/`).
-2. A utility-based agent adjusts that score with customer history and picks `approve`, `hold`, `escalate`, or `block` (`agent/`).
-3. Guardrails can turn a low-confidence or very large block into `escalate` (`backend/responder.py`).
-4. A FastAPI service stores the decision. A Streamlit dashboard lets you submit a transaction, pick one from the dataset, review escalations, and save human feedback.
+### Requirements
+- Python 3.11+
+- PostgreSQL (Production) or SQLite (Local Development Fallback)
 
-## Requirements
-
-- Python 3.11
-- The committed model at `model/model.joblib`
-- A local SQLite database at `data/transactions.db` (not committed; see below)
-
-## Setup
-
-From the project root:
-
+### Step 1: Install Dependencies
 ```bash
-python3 -m venv venv
-./venv/bin/pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
-### Database
-
-`data/transactions.db` is gitignored. If you already have it, skip this section.
-
-Otherwise, download the PaySim dataset and save it as `data/raw/paysim.csv`. The builder expects the columns `step`, `type`, `amount`, `oldbalanceOrg`, `newbalanceOrig`, and `isFraud`. Then:
-
+### Step 2: Environment Configuration
+Copy `.env.example` to `.env`:
 ```bash
-./venv/bin/python data/build_db.py
+cp .env.example .env
+```
+To use PostgreSQL, set:
+```env
+DATABASE_URL=postgresql+psycopg://username:password@localhost:5432/transaction_monitor
+```
+Or use the local development SQLite database:
+```env
+DATABASE_URL=sqlite:///data/transactions.db
 ```
 
-That samples up to 400 fraud rows and 30,000 normal `TRANSFER`, `CASH_OUT`, and `PAYMENT` rows and creates `transactions`, `actions_log`, and `feedback`.
-
-Retrain only if you rebuilt the database and want a new model:
-
+### Step 3: Database Initialization & Migration
+Run the automated migration script. It automatically builds the schema, establishes multi-tenant isolation, migrates legacy records without data loss, initializes customer profiles, and seeds default accounts and settings:
 ```bash
-./venv/bin/python model/train.py
+python -m data.migrate
 ```
 
-## Run
+Default Multi-Tenant Accounts:
+- **Platform / Acme Admin:** `admin` / `adminPassword123!` (Access to Acme & Beta workspaces)
+- **Acme Analyst:** `analyst` / `analystPassword123!` (Acme Financial Corp)
+- **Acme Reviewer:** `reviewer` / `reviewerPassword123!` (Acme Financial Corp)
+- **Beta Analyst:** `beta_analyst` / `betaPassword123!` (Beta Payments Ltd)
+- **Beta Reviewer:** `beta_reviewer` / `betaPassword123!` (Beta Payments Ltd)
 
-Use two terminals, both in the project root.
+---
 
-API:
+## 2. Running the Application
+
+Start the backend and frontend in two separate terminals from the project root:
+
+### Terminal 1: FastAPI REST Backend
+```bash
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+- Interactive API Docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+### Terminal 2: Streamlit Financial-Risk Workstation
+```bash
+python -m streamlit run frontend/app.py --server.port 8501
+```
+- Open [http://127.0.0.1:8501](http://127.0.0.1:8501) and sign in using one of the seeded accounts.
+
+---
+
+## 3. Automated Test Suite
+
+Run the full automated test suite (structural tests, security tests, verification limits, Expected Utility, and leakage prevention):
 
 ```bash
-./venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
+# Run all unit and integration tests
+pytest tests/ -v
+
+# Run scenario and edge-case benchmark tests
+python -m tests.run_tests
 ```
 
-Dashboard:
+---
+
+## 4. Reproducible Research Experiments
+
+Run the research experimentation framework to generate publication-quality benchmark tables and diagnostic plots:
 
 ```bash
-./venv/bin/streamlit run frontend/app.py
+# 1. Benchmark comparison across 6 models
+python -m experiments.compare_models
+
+# 2. Component ablation study
+python -m experiments.ablation
+
+# 3. Verification limit sensitivity analysis
+python -m experiments.limit_experiment
 ```
 
-Open [http://127.0.0.1:8501](http://127.0.0.1:8501). API docs are at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). Stop either process with Ctrl+C.
+All generated tables (`.csv`, `.md`) and plots (`.png`) are stored in `reports/`:
+- `reports/model_comparison_table.md`
+- `reports/ablation_study_table.md`
+- `reports/limit_experiment_table.md`
+- `reports/roc_curve_comparison.png`
+- `reports/pr_curve_comparison.png`
+- `reports/calibration_curves.png`
+- `reports/limit_tradeoff_plot.png`
 
-The model file is loaded from `model/model.joblib` relative to the current working directory, so start the API from the project root.
+---
 
-## Dashboard
+## 5. System Documentation
 
-- **Analyze a transaction.** Use a preset or your own values, or pick one of the first 200 dataset rows, then process it.
-- **Review & alerts.** Escalated transactions can be approved or blocked. Other alert statuses are listed in the table.
-- **Activity & learning.** Charts show the audit log. **Update agent from feedback** rewrites `agent/utility_config.json` from saved feedback. It does not retrain the fraud model.
+- [System Architecture & RBAC](docs/architecture.md)
+- [Detection & Decision Methodology](docs/methodology.md)
+- [Empirical Experiments & Benchmarks](docs/experiments.md)
+- [Assumptions, Limitations & Governance](docs/limitations.md)
 
-Human feedback accepts `approve` or `block`.
+---
 
-## API
+## 6. Project Layout
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `POST` | `/submit` | Save a new transaction and process it |
-| `POST` | `/process/{txn_id}` | Score and decide an existing transaction |
-| `GET` | `/transactions` | List transactions (`status`, `limit`) |
-| `GET` | `/alerts` | Transactions on hold, blocked, or escalated |
-| `GET` | `/review-queue` | Escalated transactions |
-| `GET` | `/actions` | Audit log |
-| `POST` | `/feedback` | Save a human `approve` or `block` |
-
-`/submit` accepts `customer_id`, `type` (`TRANSFER`, `CASH_OUT`, or `PAYMENT`), `amount`, `old_balance`, and `new_balance`.
-
-## Tests
-
-Dashboard checks (pytest is not in `requirements.txt`):
-
-```bash
-./venv/bin/pip install pytest
-./venv/bin/python -m pytest tests/test_dashboard.py -q
 ```
-
-Scenario checks against the model and database:
-
-```bash
-PYTHONPATH=. ./venv/bin/python tests/run_tests.py
+├── agent/                  # Utility agent, EUT calculation, sensitivity analysis
+├── backend/                # FastAPI app, authentication, pipeline, verification limit policy
+├── data/                   # Database configuration, models, migration, customer profiling
+├── docs/                   # Academic and architectural documentation
+├── experiments/            # Reproducible empirical evaluation scripts and config
+├── frontend/               # Streamlit financial-risk workstation
+├── model/                  # Feature engineering, Isolation Forest, calibrator
+├── learning/               # Active learning feedback policy updater
+├── reports/                # Generated research benchmark tables and plots
+├── tests/                  # Unit, security, and empirical scenario tests
+├── .env.example            # Environment template
+└── requirements.txt        # Python package dependencies
 ```
-
-## Layout
-
-| Path | Role |
-| --- | --- |
-| `frontend/app.py` | Streamlit dashboard |
-| `backend/` | FastAPI app, pipeline, guardrails |
-| `model/` | Features, training, scoring, saved model |
-| `agent/` | Utility agent and optional learned utility table |
-| `data/` | Database helpers, PaySim builder, customer profiles |
-| `learning/feedback.py` | Updates utility values from human feedback |
-| `tests/` | Dashboard checks and scenario script |
-| `docs/` | Evaluation charts and the Person 5 report |
-
-## Notes
-
-- Typed-in transactions are stored with `step` 0 and `is_fraud` 0, so customer-history adjustments do not apply to them.
-- The dataset picker requests the first 200 transaction ids, not the newest submissions.
-- The review screen only offers actions for escalated transactions.
-- Do not commit `data/transactions.db`, `data/raw/paysim.csv`, or `venv/`.

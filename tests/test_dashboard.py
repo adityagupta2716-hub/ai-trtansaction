@@ -29,4 +29,4 @@ def test_dashboard_uses_api_not_database_directly():
 def test_dashboard_has_supported_human_feedback_options():
     """The dashboard should offer the decisions supported by the API."""
     content = Path("frontend/app.py").read_text(encoding="utf-8")
-    assert '"approve", "block"' in content
+    assert "'approve', 'block'" in content or '"approve", "block"' in content

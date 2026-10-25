@@ -1,111 +1,106 @@
+"""
+Data Access Interface.
+Provides backward-compatible and SQLAlchemy-powered CRUD operations for transactions,
+actions, and feedback with tenant isolation support.
+"""
+
 from pathlib import Path
-import sqlite3
+from typing import Optional, Dict, Any, List
+from sqlalchemy.orm import Session
+from data.database import SessionLocal, DEFAULT_SQLITE_PATH
+from data.models import Transaction, AIDecision, HumanReview, Feedback, Customer
 
-DB_PATH = Path(__file__).resolve().with_name("transactions.db")
-
-VALID_STATUSES = {"pending", "approve", "hold", "block", "escalate"}
-
-
-def _connect():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+DB_PATH = DEFAULT_SQLITE_PATH
+VALID_STATUSES = {"pending", "approve", "hold", "block", "escalate", "pending_verification"}
 
 
-def get_transaction(txn_id):
-    conn = _connect()
+def get_transaction(txn_id: int, org_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+    session: Session = SessionLocal()
     try:
-        row = conn.execute(
-            "SELECT * FROM transactions WHERE transaction_id = ?",
-            (txn_id,),
-        ).fetchone()
-        return dict(row) if row else None
-    finally:
-        conn.close()
-
-
-def get_customer_history(customer_id):
-    conn = _connect()
-    try:
-        row = conn.execute(
-            """
-            SELECT COUNT(*) AS num_transactions,
-                   AVG(amount) AS average_amount,
-                   MAX(amount) AS max_amount
-            FROM transactions
-            WHERE customer_id = ?
-            """,
-            (customer_id,),
-        ).fetchone()
-
+        q = session.query(Transaction).filter(Transaction.transaction_id == txn_id)
+        if org_id is not None:
+            q = q.filter(Transaction.org_id == org_id)
+        t = q.first()
+        if not t:
+            return None
         return {
-            "customer_id": customer_id,
-            "num_transactions": row["num_transactions"],
-            "average_amount": row["average_amount"] or 0.0,
-            "max_amount": row["max_amount"] or 0.0,
+            "transaction_id": t.transaction_id,
+            "org_id": t.org_id,
+            "customer_id": t.customer_id,
+            "step": t.step,
+            "type": t.type,
+            "amount": t.amount,
+            "old_balance": t.old_balance,
+            "new_balance": t.new_balance,
+            "is_fraud": t.is_fraud,
+            "status": t.status,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
         }
     finally:
-        conn.close()
+        session.close()
 
 
-def update_status(txn_id, status):
+def get_customer_history(customer_id: int, org_id: int = 1) -> Dict[str, Any]:
+    from data.profile import build_customer_profile
+    return build_customer_profile(customer_id, org_id=org_id)
+
+
+def update_status(txn_id: int, status: str, org_id: Optional[int] = None) -> bool:
     if status not in VALID_STATUSES:
         raise ValueError(f"Invalid status: {status}")
 
-    conn = _connect()
+    session: Session = SessionLocal()
     try:
-        cursor = conn.execute(
-            "UPDATE transactions SET status = ? WHERE transaction_id = ?",
-            (status, txn_id),
-        )
-        conn.commit()
-        return cursor.rowcount > 0
+        q = session.query(Transaction).filter(Transaction.transaction_id == txn_id)
+        if org_id is not None:
+            q = q.filter(Transaction.org_id == org_id)
+        t = q.first()
+        if not t:
+            return False
+        t.status = status
+        session.commit()
+        return True
     finally:
-        conn.close()
+        session.close()
 
 
 def log_action(
-    transaction_id,
-    decision,
-    confidence,
-    reasoning,
-    decided_by="agent",
+    transaction_id: int,
+    decision: str,
+    confidence: float,
+    reasoning: str,
+    decided_by: str = "agent",
+    org_id: int = 1,
 ):
     if decision not in VALID_STATUSES - {"pending"}:
         raise ValueError(f"Invalid decision: {decision}")
 
-    conn = _connect()
+    session: Session = SessionLocal()
     try:
-        conn.execute(
-            """
-            INSERT INTO actions_log
-            (transaction_id, decision, confidence, reasoning, decided_by)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                transaction_id,
-                decision,
-                confidence,
-                reasoning,
-                decided_by,
-            ),
+        ai_dec = AIDecision(
+            org_id=org_id,
+            transaction_id=transaction_id,
+            decision=decision,
+            decision_margin=confidence,
+            reasoning=reasoning,
+            decided_by=decided_by,
         )
-        conn.commit()
+        session.add(ai_dec)
+        session.commit()
     finally:
-        conn.close()
+        session.close()
 
 
-def add_feedback(transaction_id, agent_decision, human_decision):
-    conn = _connect()
+def add_feedback(transaction_id: int, agent_decision: str, human_decision: str, org_id: int = 1):
+    session: Session = SessionLocal()
     try:
-        conn.execute(
-            """
-            INSERT INTO feedback
-            (transaction_id, agent_decision, human_decision)
-            VALUES (?, ?, ?)
-            """,
-            (transaction_id, agent_decision, human_decision),
+        fb = Feedback(
+            org_id=org_id,
+            transaction_id=transaction_id,
+            agent_decision=agent_decision,
+            human_decision=human_decision,
         )
-        conn.commit()
+        session.add(fb)
+        session.commit()
     finally:
-        conn.close()
+        session.close()

@@ -1,0 +1,38 @@
+# Research Experimentation Configuration
+dataset:
+  source: "data/transactions.db"
+  table_name: "transactions"
+  test_size: 0.20
+  val_size: 0.15
+  random_seed: 42
+  temporal_split_col: "step"
+
+models:
+  isolation_forest:
+    n_estimators: 200
+    contamination: 0.05
+    random_state: 42
+  logistic_regression:
+    max_iter: 1000
+    random_state: 42
+  random_forest:
+    n_estimators: 100
+    max_depth: 10
+    random_state: 42
+
+utility:
+  cost_matrix:
+    approve_fraud: 100.0   # Missed fraud loss
+    block_legit: 50.0       # False positive disruption cost
+    hold_legit: 8.0         # Minor friction
+    escalate_cost: 15.0     # Human analyst labor cost
+
+verification_limits_to_test:
+  - 10000.0
+  - 50000.0
+  - 100000.0
+  - 250000.0
+  - 500000.0
+  - 1000000.0
+
+output_dir: "reports"
