@@ -85,6 +85,12 @@ flowchart TD
 - Python 3.11+
 - PostgreSQL (Production) or SQLite (Local Development Fallback)
 
+### 0. Clone the Repository
+```bash
+git clone https://github.com/adityagupta2716-hub/ai-trtansaction.git
+cd ai-trtansaction
+```
+
 ### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
